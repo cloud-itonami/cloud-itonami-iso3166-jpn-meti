@@ -1,0 +1,12 @@
+{:itonami.blueprint/id "cloud-itonami-iso3166-jpn-meti"
+ :itonami.blueprint/name "Independent METI-Regulated Trade & Industrial-Policy Compliance Service — Japan (METI)"
+ :itonami.blueprint/iso3166 "JPN-METI"
+ :itonami.blueprint/iso3166-parent "JPN"
+ :itonami.blueprint/ooyake-id "gov.jpn.meti"
+ :itonami.blueprint/domain :public-sector/meti-trade-compliance
+ :itonami.blueprint/license "AGPL-3.0-or-later"
+ :itonami.blueprint/social-impact [:export-control-clarity :subsidy-access :public-spend-transparency]
+ :itonami.blueprint/governor :industrial-policy-compliance-governor
+ :itonami.blueprint/robotics false
+ :itonami.blueprint/required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+ :itonami.blueprint/status :public-oss}
