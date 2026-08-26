@@ -1,0 +1,701 @@
+;; Regulatory source register for JPN-METI export control under the Foreign
+;; Exchange and Foreign Trade Act (外為法) and METI industrial-policy
+;; subsidy/grant programs.
+;;
+;; README.md says: "Every regulatory claim must cite the official METI source."
+;; Until this file existed there was no such list, so no claim in this
+;; repository could be traced to anything. This is that list.
+;;
+;; Shape is tx-data (a vector of entity maps), like every other EDN corpus in
+;; this workspace, so it loads with
+;;   (d/transact conn (edn/read-string (slurp "facts.edn")))
+;; :source/id is the join key. A law or page not in this table has NO
+;; spec-basis for this repository -- extend the table, never invent an id or a
+;; URL.
+;;
+;; VERIFIED BY `nbb scripts/verify-facts.cljs`, which re-fetches every entry.
+;; Each carries a :source/verify tag naming WHICH check establishes it.
+;;
+;;   :e-gov-law-id   Resolve the law id through the e-Gov law API and require
+;;                   the title and the law number to still match. HTTP status
+;;                   is never consulted here and must not be:
+;;                   laws.e-gov.go.jp is a single-page app that answers
+;;                   HTTP 200 for /law/<anything>, renders "not found"
+;;                   client-side, and therefore cannot tell a real citation
+;;                   from an invented one.
+;;
+;;   :page-identity  Fetch and require four things together: a 2xx, a final
+;;                   URL that is still the page asked for, the declared
+;;                   charset, and the <title> recorded below.
+;;
+;;   :page-text      All of :page-identity, plus every string in
+;;                   :page/must-contain present in the de-tagged body.
+;;
+;; THE MINISTRY'S OWN SITE IS BEHIND A BOT CHALLENGE, AND THE CHALLENGE IS A
+;; 2xx. THIS IS THE CENTRAL MEASUREMENT OF THIS REGISTER.
+;;
+;; www.meti.go.jp sits behind AWS WAF. To an automated client it serves, in
+;; place of the page asked for, a 2468-byte JavaScript challenge carrying
+;; window.awsWafCookieDomainList and window.gokuProps. That response:
+;;
+;;   * answers HTTP **202**, which is a 2xx, so a status-only checker reports
+;;     a pass for a page it never read;
+;;   * is served AT THE REQUESTED URL with no redirect, so comparing the final
+;;     URL does not catch it either;
+;;   * carries an EMPTY <title>, which is the only field that separates it
+;;     from the authority.
+;;
+;; A verifier that checks the title but classifies the mismatch as ordinary
+;; title drift reports "the register is wrong" for a run that never reached
+;; the authority at all. That is the failure this workspace keeps finding in
+;; other forms: a check that could not run returning the same value as a check
+;; that ran and found nothing. The verifier therefore detects the challenge
+;; explicitly and REFUSES -- exit 2, neither pass nor register error.
+;;
+;; Measured 2026-08-26: a cold client gets real pages; roughly ten requests
+;; trips the challenge, which then holds for about four and a half minutes,
+;; and single requests spaced fourteen seconds apart re-trip it. Because the
+;; block is not reliably avoidable from here, THIS REGISTER CITES NO PAGE ON
+;; www.meti.go.jp. Its host entity is kept to hold the measurement and to give
+;; the challenge detector a live host, exactly as the sibling MLIT register
+;; keeps its soft-404 bureau host without citing a page on it.
+;;
+;; That is a limit on this register, not a claim about METI. The pages exist
+;; and a browser reads them. They are not-cited, not absent, and
+;; :coverage/not-covered says so.
+;;
+;; THE PAGES THAT ARE CITED ARE ON THE THREE AGENCY HOSTS THAT ANSWER.
+;; 特許庁, 中小企業庁 and 資源エネルギー庁 are METI extra-ministerial bureaux
+;; on their own hosts, and none of the three is challenged.
+;;
+;; THE HOST ASSUMPTIONS ARE MEASURED AT RUN TIME, NOT DATED IN A COMMENT.
+;; The :host-behaviour entities below say what each host does with a path that
+;; does not exist. The verifier fetches a nonexistent path on every host in the
+;; register and fails if the answer has changed. A dated note saying "measured
+;; to refuse correctly" degrades into a constant the moment it is written; a
+;; declaration the run re-measures cannot.
+;;
+;; ALL FOUR HOSTS ANSWER **403**, NOT 404, FOR A PATH THAT DOES NOT EXIST.
+;; Each serves a real Japanese "this page does not exist" body at the requested
+;; URL, with its own byte count and its own title. 403 is not 2xx, so status
+;; still discriminates -- but a checker written to look for 404 specifically,
+;; or one that reads 403 as "blocked, cannot measure", would misreport four
+;; hosts that answered perfectly clearly. The status each host actually
+;; returned is pinned in :host/missing-status and re-measured.
+;;
+;; :source/covers says why an entry is in an export-control and
+;; industrial-policy register. Claims stop at the level actually checked --
+;; law identity, and for the agency pages the title, the URL, the charset and
+;; the strings read on 2026-08-26. No article text and no PDF is asserted,
+;; because none was read.
+
+[
+ ;; ── What each host does with a path that does not exist ────────────────────
+ ;; Re-measured on every run. A change here invalidates the check that rests
+ ;; on it, which is the point of writing it down as data.
+
+ {:source/id "host.www-meti-go-jp"
+  :source/kind :host-behaviour
+  :host/name "www.meti.go.jp"
+  :host/missing-path :refuses-or-challenges
+  :host/missing-status 403
+  :host/challenge :aws-waf
+  :source/note "経済産業省 itself. Two behaviours, and the register has to allow
+                both because which one appears depends on how recently this
+                client called. Cold, a nonexistent path answers 403 with a
+                5045-byte 指定されたページまたはファイルは存在しません page.
+                Under the AWS WAF challenge, the same request answers 202 with
+                an empty title. Only a real 2xx page body -- a genuine soft 404
+                -- is a failure here. No page on this host is cited, so nothing
+                in the register rests on reaching it; this entity exists to
+                record the measurement and to give the challenge detector a
+                live host."}
+
+ {:source/id "host.www-jpo-go-jp"
+  :source/kind :host-behaviour
+  :host/name "www.jpo.go.jp"
+  :host/missing-path :refuses-or-challenges
+  :host/missing-status 403
+  :host/challenge :aws-waf
+  :source/note "特許庁. Cold, a nonexistent path answers 403 with a 9939-byte
+                お探しのページが見つかりません page served at the requested URL,
+                and the title of that page differs from the front page title, so
+                both status and title separate a real page from an invented one.
+
+                It is ALSO behind the same AWS WAF as the ministry host, which
+                is not obvious from casual use: it served hundreds of bytes of
+                real pages during this register's construction and only
+                challenged when asked for the SAME page five times in a row
+                about a second and a half apart. What produced that burst was
+                this register's own verifier -- an early revision drove every
+                page self-test against one probe entry. The verifier refused,
+                correctly, and reported nothing about the register; the fix was
+                to spread the self-tests across hosts, and to put a host
+                measured to challenge LAST in the self-test pool rather than
+                first.
+
+                The block here did not clear the way the ministry host's did.
+                www.meti.go.jp answered normally again about four and a half
+                minutes after being tripped; this host was still challenging
+                the better part of an hour later, under repeated checking that
+                may itself have kept renewing it. So: the recovery time is not
+                a property of AWS WAF that can be read off one host and applied
+                to another, and no number for it is written down here as though
+                it were.
+
+                So a challenge here is a declared behaviour, not a failure. Only
+                a real 2xx page body for a path that does not exist is."}
+
+ {:source/id "host.www-chusho-meti-go-jp"
+  :source/kind :host-behaviour
+  :host/name "www.chusho.meti.go.jp"
+  :host/missing-path :refuses
+  :host/missing-status 403
+  :source/note "中小企業庁. Answers 403 with a 2950-byte
+                指定されたページまたはファイルは存在しません page -- the same
+                wording METI's own host uses, on a different host with a
+                different byte count and no ministry suffix in the title."}
+
+ {:source/id "host.www-enecho-meti-go-jp"
+  :source/kind :host-behaviour
+  :host/name "www.enecho.meti.go.jp"
+  :host/missing-path :refuses
+  :host/missing-status 403
+  :source/note "資源エネルギー庁. Answers 403 with a 34244-byte
+                お探しのページが見つかりません page -- larger than most real
+                pages on the host, because it carries the full site navigation.
+                Body size is not a signal; the status is."}
+
+ ;; ── Statute: the agency itself ─────────────────────────────────────────────
+
+ {:source/id "law.meti-establishment"
+  :source/kind :statute
+  :source/title "経済産業省設置法"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/411AC0000000099"
+  :source/verify :e-gov-law-id
+  :egov/law-id "411AC0000000099"
+  :egov/law-title "経済産業省設置法"
+  :egov/law-num "平成十一年法律第九十九号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:agency-mandate}
+  :source/note "The Act that constitutes METI out of the former Ministry of
+                International Trade and Industry (通商産業省). Article text not
+                read; this entry establishes that the Act exists and is
+                identified correctly, nothing further."}
+
+ ;; ── Statutes: export control (安全保障貿易管理) ────────────────────────────
+
+ {:source/id "law.fefta"
+  :source/kind :statute
+  :source/title "外国為替及び外国貿易法"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/324AC0000000228"
+  :source/verify :e-gov-law-id
+  :egov/law-id "324AC0000000228"
+  :egov/law-title "外国為替及び外国貿易法"
+  :egov/law-num "昭和二十四年法律第二百二十八号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:export-control}
+  :source/note "外為法 / FEFTA, the statute the export-control half of this
+                repository is about. Identity only -- the licence requirement,
+                the list-control and catch-all regimes and the penalties are
+                NOT asserted here because no article text was read. Note the
+                register title carries no abbreviation: 外為法 is a customary
+                short form and is not the title e-Gov holds."}
+
+ {:source/id "law.export-trade-control-order"
+  :source/kind :statute
+  :source/title "輸出貿易管理令"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/324CO0000000378"
+  :source/verify :e-gov-law-id
+  :egov/law-id "324CO0000000378"
+  :egov/law-title "輸出貿易管理令"
+  :egov/law-num "昭和二十四年政令第三百七十八号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:export-control :goods-classification}
+  :source/note "The Cabinet Order carrying 別表第一, the goods list that
+                classification works against. Same 昭和二十四年 year as its
+                parent Act here -- which is a coincidence of this pair, not a
+                rule: a subordinate instrument's id carries its own year."}
+
+ {:source/id "law.foreign-exchange-order"
+  :source/kind :statute
+  :source/title "外国為替令"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/355CO0000000260"
+  :source/verify :e-gov-law-id
+  :egov/law-id "355CO0000000260"
+  :egov/law-title "外国為替令"
+  :egov/law-num "昭和五十五年政令第二百六十号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:export-control :technology-transfer}
+  :source/note "The Order carrying 別表, the technology list -- the intangible
+                technology-transfer side that sits beside the goods list. A
+                昭和五十五年 Order under a 昭和二十四年 Act, the counterexample
+                to reading a parent's year off a subordinate instrument."}
+
+ {:source/id "law.export-trade-control-rules"
+  :source/kind :statute
+  :source/title "輸出貿易管理規則"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/324M50000400064"
+  :source/verify :e-gov-law-id
+  :egov/law-id "324M50000400064"
+  :egov/law-title "輸出貿易管理規則"
+  :egov/law-num "昭和二十四年通商産業省令第六十四号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:export-control :filing-forms}
+  :source/note "Ministerial Ordinance carrying the export-licence application
+                forms. Issued by 通商産業省, a ministry that no longer exists --
+                the issuing body in a law number is historical and is not
+                restated as METI."}
+
+ {:source/id "law.goods-and-technology-ordinance"
+  :source/kind :statute
+  :source/title "輸出貿易管理令別表第一及び外国為替令別表の規定に基づき貨物又は技術を定める省令"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/403M50000400049"
+  :source/verify :e-gov-law-id
+  :egov/law-id "403M50000400049"
+  :egov/law-title "輸出貿易管理令別表第一及び外国為替令別表の規定に基づき貨物又は技術を定める省令"
+  :egov/law-num "平成三年通商産業省令第四十九号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:export-control :goods-classification :technology-transfer}
+  :source/note "貨物等省令, the ordinance that carries the actual technical
+                specifications a 該非判定 turns on. It is the single most
+                load-bearing instrument for classification work and this
+                register establishes ONLY that it exists and is identified
+                correctly -- not one specification in it is asserted."}
+
+ {:source/id "law.appendix-two-ordinance"
+  :source/kind :statute
+  :source/title "輸出貿易管理令別表第二及び別表第七の規定に基づき貨物を定める省令"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/404M50000400038"
+  :source/verify :e-gov-law-id
+  :egov/law-id "404M50000400038"
+  :egov/law-title "輸出貿易管理令別表第二及び別表第七の規定に基づき貨物を定める省令"
+  :egov/law-num "平成四年通商産業省令第三十八号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:export-control :goods-classification}
+  :source/note "Ordinance under 別表第二 and 別表第七 of the Export Trade
+                Control Order. Identity only."}
+
+ {:source/id "law.catch-all-ordinance"
+  :source/kind :statute
+  :source/title "輸出貨物が輸出貿易管理令別表第一の一の項の中欄に掲げる貨物（核兵器等に該当するものを除く。）の開発、製造又は使用のために用いられるおそれがある場合を定める省令"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/420M60000400057"
+  :source/verify :e-gov-law-id
+  :egov/law-id "420M60000400057"
+  :egov/law-title "輸出貨物が輸出貿易管理令別表第一の一の項の中欄に掲げる貨物（核兵器等に該当するものを除く。）の開発、製造又は使用のために用いられるおそれがある場合を定める省令"
+  :egov/law-num "平成二十年経済産業省令第五十七号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:export-control}
+  :source/note "The ordinance behind the catch-all limb. The first instrument
+                in this register issued as 経済産業省令 rather than
+                通商産業省令 -- the ministry name in a law number tracks the
+                date of issue, not the ministry administering it today."}
+
+ {:source/id "law.competent-minister-order"
+  :source/kind :statute
+  :source/title "外国為替及び外国貿易法における主務大臣を定める政令"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/355CO0000000259"
+  :source/verify :e-gov-law-id
+  :egov/law-id "355CO0000000259"
+  :egov/law-title "外国為替及び外国貿易法における主務大臣を定める政令"
+  :egov/law-num "昭和五十五年政令第二百五十九号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:export-control :agency-mandate}
+  :source/note "The Order that allocates 主務大臣 under FEFTA. This is the
+                instrument that makes METI, rather than another ministry, the
+                addressee for a given filing -- which is why a leaf repository
+                scoped to one ministry cites it. Identity only: WHICH minister
+                is competent for which transaction is article text and is not
+                asserted."}
+
+ {:source/id "law.invisible-trade-ordinance"
+  :source/kind :statute
+  :source/title "貿易関係貿易外取引等に関する省令"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/410M50000400008"
+  :source/verify :e-gov-law-id
+  :egov/law-id "410M50000400008"
+  :egov/law-title "貿易関係貿易外取引等に関する省令"
+  :egov/law-num "平成十年通商産業省令第八号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:export-control :technology-transfer}
+  :source/note "The ordinance governing service transactions and technology
+                provision -- the limb that catches a consultancy sending
+                controlled technology abroad, as distinct from shipping goods.
+                Identity only."}
+
+ ;; ── Statutes: subsidies and industrial policy ──────────────────────────────
+
+ {:source/id "law.subsidy-budget-act"
+  :source/kind :statute
+  :source/title "補助金等に係る予算の執行の適正化に関する法律"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/330AC0000000179"
+  :source/verify :e-gov-law-id
+  :egov/law-id "330AC0000000179"
+  :egov/law-title "補助金等に係る予算の執行の適正化に関する法律"
+  :egov/law-num "昭和三十年法律第百七十九号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:subsidy-compliance}
+  :source/note "補助金適正化法, the general Act governing every national
+                subsidy -- not a METI instrument, but the statute that makes a
+                METI grant a regulated object at all. Identity only: the
+                reporting duties, the disposal restriction on subsidised
+                assets and the clawback provisions are article text and are
+                NOT asserted."}
+
+ {:source/id "law.subsidy-budget-order"
+  :source/kind :statute
+  :source/title "補助金等に係る予算の執行の適正化に関する法律施行令"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/330CO0000000255"
+  :source/verify :e-gov-law-id
+  :egov/law-id "330CO0000000255"
+  :egov/law-title "補助金等に係る予算の執行の適正化に関する法律施行令"
+  :egov/law-num "昭和三十年政令第二百五十五号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:subsidy-compliance}
+  :source/note "Cabinet Order under 補助金適正化法. Identity only."}
+
+ {:source/id "law.industrial-competitiveness"
+  :source/kind :statute
+  :source/title "産業競争力強化法"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/425AC0000000098"
+  :source/verify :e-gov-law-id
+  :egov/law-id "425AC0000000098"
+  :egov/law-title "産業競争力強化法"
+  :egov/law-num "平成二十五年法律第九十八号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:industrial-policy}
+  :source/note "The Act most METI industrial-policy support schemes are
+                approved under. Identity only."}
+
+ {:source/id "law.industrial-competitiveness-meti-rules"
+  :source/kind :statute
+  :source/title "経済産業省関係産業競争力強化法施行規則"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/426M60000400001"
+  :source/verify :e-gov-law-id
+  :egov/law-id "426M60000400001"
+  :egov/law-title "経済産業省関係産業競争力強化法施行規則"
+  :egov/law-num "平成二十六年経済産業省令第一号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:industrial-policy :filing-forms}
+  :source/note "METI's own implementing rules under the Act, carrying the
+                application forms. The title begins 経済産業省関係 because
+                other ministries issue their own rules under the same Act --
+                citing the bare 施行規則 would be citing a different
+                instrument."}
+
+ {:source/id "law.gx-transition"
+  :source/kind :statute
+  :source/title "脱炭素成長型経済構造への円滑な移行の推進に関する法律"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/505AC0000000032"
+  :source/verify :e-gov-law-id
+  :egov/law-id "505AC0000000032"
+  :egov/law-title "脱炭素成長型経済構造への円滑な移行の推進に関する法律"
+  :egov/law-num "令和五年法律第三十二号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:industrial-policy :gx}
+  :source/note "GX推進法. README names GX schemes as in scope; this is the
+                statute behind them. The customary name GX推進法 appears
+                nowhere in the title e-Gov holds, which is why the register
+                pins the full title and not the abbreviation."}
+
+ {:source/id "law.gx-transition-rules"
+  :source/kind :statute
+  :source/title "脱炭素成長型経済構造への円滑な移行の推進に関する法律施行規則"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/506M60000400003"
+  :source/verify :e-gov-law-id
+  :egov/law-id "506M60000400003"
+  :egov/law-title "脱炭素成長型経済構造への円滑な移行の推進に関する法律施行規則"
+  :egov/law-num "令和六年経済産業省令第三号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:industrial-policy :gx :filing-forms}
+  :source/note "METI ordinance under the GX Act. Identity only."}
+
+ {:source/id "law.information-processing"
+  :source/kind :statute
+  :source/title "情報処理の促進に関する法律"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/345AC0000000090"
+  :source/verify :e-gov-law-id
+  :egov/law-id "345AC0000000090"
+  :egov/law-title "情報処理の促進に関する法律"
+  :egov/law-num "昭和四十五年法律第九十号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:industrial-policy :dx}
+  :source/note "情促法, the Act behind the DX認定 scheme README names as in
+                scope. A 昭和四十五年 Act carrying a 2020s certification
+                programme -- the age of a statute says nothing about the age of
+                the scheme run under it. Identity only; the DX認定 criteria are
+                not asserted."}
+
+ {:source/id "law.information-processing-rules"
+  :source/kind :statute
+  :source/title "情報処理の促進に関する法律施行規則"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/428M60000400102"
+  :source/verify :e-gov-law-id
+  :egov/law-id "428M60000400102"
+  :egov/law-title "情報処理の促進に関する法律施行規則"
+  :egov/law-num "平成二十八年経済産業省令第百二号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:industrial-policy :dx :filing-forms}
+  :source/note "METI ordinance under 情促法. Identity only."}
+
+ {:source/id "law.sme-basic"
+  :source/kind :statute
+  :source/title "中小企業基本法"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/338AC0000000154"
+  :source/verify :e-gov-law-id
+  :egov/law-id "338AC0000000154"
+  :egov/law-title "中小企業基本法"
+  :egov/law-num "昭和三十八年法律第百五十四号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:industrial-policy :sme}
+  :source/note "The Act defining 中小企業者, the eligibility gate most METI
+                subsidy schemes are scoped by. The capital and headcount
+                thresholds are article text and are NOT asserted here, which
+                matters because an operator reading this register must not
+                conclude it can tell whether a given company qualifies."}
+
+ {:source/id "law.unfair-competition"
+  :source/kind :statute
+  :source/title "不正競争防止法"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/405AC0000000047"
+  :source/verify :e-gov-law-id
+  :egov/law-id "405AC0000000047"
+  :egov/law-title "不正競争防止法"
+  :egov/law-num "平成五年法律第四十七号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:trade-secrets}
+  :source/note "METI-administered. Cited because the technology a 該非判定
+                classifies is usually also a trade secret, so the two regimes
+                land on the same documents. Identity only."}
+
+ {:source/id "law.industrial-standardization"
+  :source/kind :statute
+  :source/title "産業標準化法"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/324AC0000000185"
+  :source/verify :e-gov-law-id
+  :egov/law-id "324AC0000000185"
+  :egov/law-title "産業標準化法"
+  :egov/law-num "昭和二十四年法律第百八十五号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:industrial-policy :standards}
+  :source/note "The JIS Act. Renamed from 工業標準化法 in 2019 while keeping
+                its 昭和二十四年 law id and law number -- so the id resolves to
+                a title that the id itself does not spell, and searching e-Gov
+                for the old name does not find it."}
+
+ {:source/id "law.patent"
+  :source/kind :statute
+  :source/title "特許法"
+  :source/publisher "e-Gov 法令検索 (Digital Agency)"
+  :source/url "https://laws.e-gov.go.jp/law/334AC0000000121"
+  :source/verify :e-gov-law-id
+  :egov/law-id "334AC0000000121"
+  :egov/law-title "特許法"
+  :egov/law-num "昭和三十四年法律第百二十一号"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:intellectual-property}
+  :source/note "Administered by 特許庁, a METI extra-ministerial bureau. Cited
+                because it is the statute behind the one METI-family host in
+                this register whose pages could be read. Identity only."}
+
+ ;; ── 特許庁 pages ───────────────────────────────────────────────────────────
+
+ {:source/id "jpo.home"
+  :source/kind :agency-page
+  :source/title "特許庁ホーム"
+  :source/publisher "経済産業省 特許庁"
+  :source/url "https://www.jpo.go.jp/"
+  :source/verify :page-identity
+  :page/title "ホーム | 経済産業省 特許庁"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:intellectual-property}
+  :source/note "Front page. Its title differs from the title of this host's
+                own not-found page, which is what makes :page-identity mean
+                something here on top of the status."}
+
+ {:source/id "jpo.laws"
+  :source/kind :agency-page
+  :source/title "法令・施策"
+  :source/publisher "経済産業省 特許庁"
+  :source/url "https://www.jpo.go.jp/system/laws/index.html"
+  :source/verify :page-text
+  :page/title "法令・施策 | 経済産業省 特許庁"
+  :page/must-contain ["法令・基準"
+                      "法人番号 2000012090003"
+                      "〒100-8915"
+                      "東京都千代田区霞が関3丁目4番3号"]
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:intellectual-property :agency-mandate}
+  :source/note "The bureau's own law index. The strings pinned above include
+                its 法人番号 and its address, which are the only
+                machine-checkable identifiers any page in this register
+                carries. Note the address is 霞が関3丁目4番3号, a different
+                building from the METI headquarters organization.edn records at
+                霞が関1-3-1 -- this page establishes 特許庁's location and says
+                nothing about the ministry's."}
+
+ ;; ── 中小企業庁 pages ───────────────────────────────────────────────────────
+
+ {:source/id "chusho.home"
+  :source/kind :agency-page
+  :source/title "中小企業庁ホーム"
+  :source/publisher "経済産業省 中小企業庁"
+  :source/url "https://www.chusho.meti.go.jp/"
+  :source/verify :page-identity
+  :page/title "経済産業省 中小企業庁"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:sme :industrial-policy}
+  :source/note "Front page. Its title has no separator and no page name, unlike
+                every other page cited on this host -- a title convention is a
+                per-page fact, not a per-host one."}
+
+ {:source/id "chusho.management-innovation"
+  :source/kind :agency-page
+  :source/title "経営革新支援"
+  :source/publisher "経済産業省 中小企業庁"
+  :source/url "https://www.chusho.meti.go.jp/keiei/kakushin/index.html"
+  :source/verify :page-text
+  :page/title "経営革新支援 | 中小企業庁"
+  :page/must-contain ["経営革新計画"]
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:sme :industrial-policy :subsidy-compliance}
+  :source/note "The 経営革新計画 approval scheme, one of the support routes an
+                operator would actually navigate. Note the page is titled
+                経営革新支援 while the scheme and the navigation link are both
+                called 経営革新計画 -- the register pins the title the page
+                serves, not the name it is known by. The title also says
+                中小企業庁 without the 経済産業省 prefix its own front page
+                carries."}
+
+ {:source/id "chusho.finance"
+  :source/kind :agency-page
+  :source/title "金融一般支援"
+  :source/publisher "経済産業省 中小企業庁"
+  :source/url "https://www.chusho.meti.go.jp/kinyu/index.html"
+  :source/verify :page-identity
+  :page/title "金融一般支援 | 中小企業庁"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:sme :industrial-policy}
+  :source/note "The financing-support index. Titled 金融一般支援 while the
+                link that reaches it reads 金融支援一般 -- the same four
+                characters in a different order. Nothing but reading the page
+                distinguishes these."}
+
+ ;; ── 資源エネルギー庁 pages ─────────────────────────────────────────────────
+
+ {:source/id "enecho.home"
+  :source/kind :agency-page
+  :source/title "資源エネルギー庁ホーム"
+  :source/publisher "経済産業省 資源エネルギー庁"
+  :source/url "https://www.enecho.meti.go.jp/"
+  :source/verify :page-identity
+  :page/title "資源エネルギー庁WEBサイト｜資源エネルギー庁"
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:gx}
+  :source/note "Front page. Its title separator is the FULL-WIDTH ｜ (U+FF5C),
+                where 特許庁 and 中小企業庁 both use the ASCII |. A register
+                that normalised punctuation would compare these as equal and
+                stop being able to tell one host's page from another's."}
+
+ {:source/id "enecho.basic-plan"
+  :source/kind :agency-page
+  :source/title "エネルギー基本計画について"
+  :source/publisher "経済産業省 資源エネルギー庁"
+  :source/url "https://www.enecho.meti.go.jp/category/others/basic_plan/"
+  :source/verify :page-text
+  :page/title "エネルギー基本計画について｜資源エネルギー庁"
+  :page/must-contain ["第7次エネルギー基本計画"
+                      "令和7年2月18日"]
+  :source/retrieved-at "2026-08-26"
+  :source/covers #{:gx :industrial-policy}
+  :source/note "The Basic Energy Plan index, the policy frame the GX schemes
+                sit inside. The two strings pinned are the plan's ordinal and
+                its cabinet-decision date. The plan itself is a PDF and is NOT
+                read: this entry establishes that a seventh plan was decided on
+                that date and where it is published, not what it says."}
+
+ ;; ── What this register does not establish ──────────────────────────────────
+
+ {:source/id "register.coverage"
+  :source/kind :coverage
+  :coverage/entries 29
+  :coverage/by-verify {:e-gov-law-id 22 :page-identity 4 :page-text 3}
+  :coverage/verified-at "2026-08-26"
+  :coverage/covered #{:agency-mandate :export-control :goods-classification
+                      :technology-transfer :subsidy-compliance :industrial-policy
+                      :gx :dx :sme :trade-secrets :standards
+                      :intellectual-property :filing-forms}
+  :coverage/not-covered
+  ["Article text. All 22 statutes are established at identity level only --
+    title plus law number, resolved through the e-Gov API. No article,
+    paragraph or item is cited, so nothing here supports a claim about what
+    any of these laws requires."
+   "The export-control scheme's own parameters. 該非判定 itself, the list-control
+    and catch-all limbs, リスト規制 vs キャッチオール規制, the 包括許可 classes
+    and the penalties are all real features of this scheme and NONE of them is
+    asserted anywhere in this register -- they live in article text, in 貨物等省令
+    specifications and in guidance PDFs, none of which was read."
+   "Every page on www.meti.go.jp, the ministry's own site. It is behind an AWS
+    WAF that answers automated clients with a 202 JavaScript challenge; a cold
+    client gets real pages but roughly ten requests trips it for about four and
+    a half minutes, and single requests fourteen seconds apart re-trip it. No
+    page there could be read reliably enough to cite. Not-cited, not absent --
+    the pages exist and a browser reads them."
+   "How reliably the three cited agency hosts can be read in a tight loop. All
+    three are behind the same WAF and all three were seen to challenge while
+    this register was being built -- by its own traffic, not by anything a
+    normal run does. A single verification makes on the order of a dozen agency
+    requests spread over half a minute and was not blocked; running the verifier
+    fifteen times in an hour blocked all three. That is a limit on how often
+    this register can be checked, and it is not a claim that the pages are
+    unstable."
+   "Therefore the whole of organization.edn is unverified by this register. Its
+    :hq block claims 〒100-8901, 東京都千代田区霞が関1-3-1, 03-3501-1511 and
+    平日 9:30-18:15 with :provenance https://www.meti.go.jp/ and :last-verified
+    2026-06-02. The only address this register establishes is 特許庁's, at
+    霞が関3丁目4番3号, which is a different building and is not evidence about
+    the ministry's. Nothing in organization.edn was confirmed and nothing in it
+    was corrected."
+   "Every PDF. The 安全保障貿易管理 guidance, the licence application forms and
+    the 第7次エネルギー基本計画 itself are PDFs. This register establishes that
+    the schemes exist and where they are described, not what the forms ask for."
+   "Fees and processing times. Not asserted, because they move."
+   "NACCS and the electronic export-licence filing route. Not reached and not
+    cited."
+   "CISTEC and the other industry bodies that publish classification guidance.
+    They are not the authority and a register of official sources does not
+    cite them."
+   "The 経済産業局 regional bureaux. METI's regional offices receive many of
+    these filings and none of their hosts was surveyed."
+   "Anything administered by 財務省 or 税関. Export declaration and customs
+    clearance sit beside export control and are a different authority, out of
+    scope for a JPN-METI leaf."
+   "Whether any statute here is currently in force as amended. The e-Gov API
+    answers with a current revision title and number, which establishes
+    identity, not applicability on a given date."]
+  :source/note "This entity is checked against the file: the verifier compares
+                :coverage/entries and :coverage/by-verify with what it actually
+                read, so a source added without updating this block is a
+                failure rather than a silent drift."}
+]

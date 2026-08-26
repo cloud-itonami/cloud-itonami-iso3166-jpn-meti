@@ -64,6 +64,93 @@ Resolves via [`kotoba-lang/iso3166`](https://github.com/kotoba-lang/iso3166)
 See [`docs/business-model.md`](docs/business-model.md) and
 [`docs/operator-guide.md`](docs/operator-guide.md).
 
+## Regulatory sources
+
+`facts.edn` is the register every regulatory claim in this repository has to
+cite. It is tx-data, so it loads the same way as every other EDN corpus here:
+
+```clojure
+(d/transact conn (edn/read-string (slurp "facts.edn")))
+```
+
+`nbb scripts/verify-facts.cljs` re-fetches all of it against the live
+authority and exits `0` verified / `1` the register is wrong / `2` the run
+could not answer. The third code carries most of the weight on these hosts,
+for the reason below.
+
+Each entry names *which* check establishes it, because they are not
+interchangeable:
+
+| `:source/verify` | What it establishes |
+|---|---|
+| `:e-gov-law-id` | The id resolves through the e-Gov law API to the recorded title **and** law number. Status is never consulted: `laws.e-gov.go.jp` answers 200 for `/law/<anything>`. |
+| `:page-identity` | 2xx, **and** the final URL is still the page asked for, **and** the declared charset, **and** the recorded `<title>`. |
+| `:page-text` | All of the above, plus every string in `:page/must-contain`. |
+
+### The bot challenge is a 2xx
+
+`www.meti.go.jp` is behind AWS WAF. To an automated client it serves, instead
+of the page, a 2468-byte JavaScript challenge — and that response answers
+**HTTP 202**, at the requested URL, with no redirect and an empty `<title>`:
+
+| Check | Sees | Verdict |
+|---|---|---|
+| status | `202` is 2xx | pass |
+| final URL | served where it was asked for | pass |
+| charset | declared utf-8, served utf-8 | pass |
+| `<title>` | `""` vs the expected title | **mismatch** |
+
+A verifier that stops there calls this *title drift* and exits `1` — reporting
+"the register is wrong" about a run that never reached the authority. The
+register is not wrong; the run could not answer. So the challenge is detected
+by its own signature **before** the status branch and reported as
+`:challenge-interposed` with exit `2`.
+
+This is the defect class this workspace keeps finding, running the other way:
+not a check that could not run returning the value of one that ran clean, but
+a check that could not run returning the value of one that ran and *failed* —
+which sends whoever reads it to edit a register that was correct.
+
+### What that costs this register
+
+**No page on `www.meti.go.jp` is cited.** A cold client reads real pages, but
+roughly ten requests trips the challenge, it then holds for about four and a
+half minutes, and single requests fourteen seconds apart re-trip it. The
+ministry's own site could not be read reliably enough to cite from here — the
+pages exist and a browser reads them, so they are *not-cited, not absent*, and
+`:coverage/not-covered` says so. One consequence is recorded there rather than
+papered over: **nothing in `organization.edn` is confirmed by this register**,
+because the page carrying METI's address is on that host.
+
+The pages that *are* cited are on the three extra-ministerial bureau hosts
+that answer — 特許庁, 中小企業庁 and 資源エネルギー庁.
+
+### Two more things measured rather than assumed
+
+- **All four hosts answer `403`, not `404`, for a path that does not exist**,
+  each with its own real Japanese "this page does not exist" body at the
+  requested URL. 403 is not 2xx so status still discriminates — but a checker
+  looking for 404 specifically, or one reading 403 as "blocked, cannot
+  measure", would misreport four hosts that answered perfectly clearly. The
+  status each host returned is pinned in `:host/missing-status` and compared
+  on every run.
+- **Fetches are serial and paced, and that is a measurement, not a style.**
+  The sibling MLIT verifier fetches every page concurrently; doing that here
+  is what *trips* the challenge. An early revision of this verifier also drove
+  all four page self-tests against a single probe entry, asking one page five
+  times in about six seconds — which tripped 特許庁's WAF, and the run refused
+  because of its own traffic. The self-tests are now spread across hosts, hosts
+  measured to challenge are placed *last* in that rotation, and the verifier
+  refuses outright if every `:page-identity` entry is on one host.
+
+  Recovery time is not uniform and no figure for it is written down as though
+  it were: `www.meti.go.jp` answered normally again about four and a half
+  minutes after being tripped, while `www.jpo.go.jp` was still challenging most
+  of an hour later.
+
+The host assumptions live in `:host-behaviour` entities and are re-measured on
+every run, rather than written down once with a date beside them.
+
 ## License
 
 AGPL-3.0-or-later.
