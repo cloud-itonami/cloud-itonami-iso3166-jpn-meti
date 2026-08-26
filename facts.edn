@@ -499,10 +499,17 @@
   :egov/law-num "昭和二十四年法律第百八十五号"
   :source/retrieved-at "2026-08-26"
   :source/covers #{:industrial-policy :standards}
-  :source/note "The JIS Act. Renamed from 工業標準化法 in 2019 while keeping
-                its 昭和二十四年 law id and law number -- so the id resolves to
-                a title that the id itself does not spell, and searching e-Gov
-                for the old name does not find it."}
+  :source/note "The JIS Act. Renamed from 工業標準化法 in 2019 while keeping its
+                昭和二十四年 law id and law number, so the id resolves to a
+                current title under a law number issued in the name of the old
+                one.
+
+                An earlier draft of this note added that searching e-Gov for
+                the old name would not find it. That was written from
+                plausibility rather than measurement, and it is false: the API
+                answers 工業標準化法 with total_count 8, this Act first. The
+                claim was removed rather than left standing, which is the whole
+                point of a register whose entries are re-fetched."}
 
  {:source/id "law.patent"
   :source/kind :statute
