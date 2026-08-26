@@ -263,11 +263,12 @@
   :egov/law-num "平成三年通商産業省令第四十九号"
   :source/retrieved-at "2026-08-26"
   :source/covers #{:export-control :goods-classification :technology-transfer}
-  :source/note "貨物等省令, the ordinance that carries the actual technical
-                specifications a 該非判定 turns on. It is the single most
-                load-bearing instrument for classification work and this
-                register establishes ONLY that it exists and is identified
-                correctly -- not one specification in it is asserted."}
+  :source/note "貨物等省令, the ordinance that carries the technical
+                specifications a 該非判定 is made against. It is cited because
+                classification work reaches for it, and this register
+                establishes ONLY that it exists and is identified correctly --
+                not one specification in it is asserted, because none was
+                read."}
 
  {:source/id "law.appendix-two-ordinance"
   :source/kind :statute
