@@ -117,6 +117,24 @@
   2026-08-26, that is exactly what turned three law mutations INCONCLUSIVE."
   (subset #{"law.fefta"}))
 
+(def UNROUTABLE-HOST
+  "A :host-behaviour on a host that cannot resolve.
+
+  .invalid is reserved by RFC 2606 and is guaranteed never to resolve, so this
+  produces a refusal from the FIXTURE rather than from the weather -- no agency
+  host has to be slow or blocked for the mutation below to mean something.
+
+  A host entity and not a page, on purpose: a register that cites no page skips
+  the four page self-tests, so this whole mutation costs one e-Gov lookup and
+  one DNS failure and touches no challenged host at all. A page would have
+  dragged the self-test pool, and its bot challenge, back in."
+  [{:source/id "host.unroutable-fixture-invalid"
+    :source/kind :host-behaviour
+    :host/name "no-such-host.invalid"
+    :host/missing-path :refuses-or-challenges
+    :host/missing-status 403
+    :source/note "FIXTURE. RFC 2606 reserved TLD; never resolves."}])
+
 (def with-pages
   "One law plus the two front pages that give the self-test pool two hosts, and
   one :page-text entry -- the smallest register that still reaches the page
@@ -237,6 +255,32 @@
     :mutate #(alter-entity % "law.fefta" (fn [e] (assoc e :egov/law-num "昭和二十四年法律第二百二十九号")))
     :want-exit 1 :want-reason "law-num-drift"}
 
+   ;; THE ONLY MUTATION HERE THAT BREAKS THE REGISTER IN TWO PLACES AT ONCE,
+   ;; because the thing under test is which of the two the verifier reports.
+   ;; It is also the only one that EXPECTS a blockage, so it names the KIND it
+   ;; expects. Without that the guard in `verdict` would read the BLOCKED token
+   ;; this mutation deliberately causes and call the run inconclusive, and the
+   ;; mutation could never be caught. Naming the kind rather than setting a
+   ;; boolean keeps the safety: a bot challenge, which is a DIFFERENT kind,
+   ;; still makes this run inconclusive like every other.
+   {:id "fail-outranks-refusal" :on :laws-only
+    :expects-blocked "unreachable"
+    :why (str "a register with a real finding AND an unreachable source at the "
+              "same time. The finding has to win: a host that could not be "
+              "reached establishes nothing about a law that WAS looked up and "
+              "found wrong, so it must not turn exit 1 into exit 2. Before "
+              "2026-08-29 it did, and that is how one intermittently blocked "
+              "page hid a register error for as long as it stayed blocked -- "
+              "observed on the live register with pass=31 fail=1 refused=1 "
+              "reported as 'could not answer'.")
+    :mutate (fn [d]
+              (recount
+                (-> d
+                    (alter-entity "law.fefta"
+                                  (fn [e] (assoc e :egov/law-title "外国為替法")))
+                    (into UNROUTABLE-HOST))))
+    :want-exit 1 :want-reason "law-title-drift"}
+
    {:id "page-title-drift"
     :why "a real page recorded under a title it does not carry"
     :mutate #(alter-entity % "enecho.home" (fn [e] (assoc e :page/title "資源エネルギー庁")))
@@ -301,12 +345,29 @@
         ;; that were never blocked -- including the verifier's own explanation
         ;; of what trips a challenge. See the note beside `blocked` in
         ;; verify-facts.cljs.
-        challenged (str/includes? out "BLOCKED\tchallenge")]
+        ;; Which KINDS of blockage this run reported. Until 2026-08-29 this
+        ;; matched "BLOCKED\tchallenge" exactly, so a run stopped by a TIMEOUT
+        ;; -- which emitted no token at all -- came back here as exit 2 with
+        ;; the wanted reason somewhere in the output, and was reported
+        ;; WRONG-EXIT: "the verifier does not discriminate". The verifier was
+        ;; fine. The run had not happened.
+        blocked-kinds (into #{} (map second)
+                            (re-seq #"BLOCKED\t(\w+)\t" out))
+        ;; A mutation may declare ONE kind as part of its own fixture. Any
+        ;; OTHER kind still makes the run inconclusive -- otherwise the one
+        ;; mutation that expects a blockage would silently accept a run that a
+        ;; bot challenge had actually stopped.
+        challenged (seq (disj blocked-kinds (:expects-blocked m)))]
     (cond
       ;; A blocked run says nothing about the mutation. Not a pass, not a fail.
+      ;; UNLESS the mutation is the one that deliberately causes the blockage:
+      ;; for that one the blockage is half the fixture, and treating it as
+      ;; "not tested" would make the only check of the fail-beats-refusal
+      ;; ordering permanently unrunnable.
       (and challenged (not (str/includes? (:want-reason m) "challenge")))
       {:state :inconclusive
-       :note (str "a bot challenge stood in the way (exit " exit
+       :note (str (str/join " and " (sort challenged))
+                  " stood in the way (exit " exit
                   "), so this mutation was not actually tested")}
 
       (and (= exit (:want-exit m)) reason-seen)

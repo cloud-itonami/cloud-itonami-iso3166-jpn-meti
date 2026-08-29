@@ -78,6 +78,21 @@ authority and exits `0` verified / `1` the register is wrong / `2` the run
 could not answer. The third code carries most of the weight on these hosts,
 for the reason below.
 
+**A finding outranks a blockage.** If one source was read and found wrong while
+another was blocked, the run exits `1`, not `2` — a page that could not be
+reached says nothing about a different page that *was* reached, decoded and
+read, so it cannot unmake that finding. The blocked ones are still counted and
+still printed, and the exit-`1` message says the failure count is a *floor*, so
+it is never read as "everything else verified". Exit `2` is reserved for a run
+that established nothing. Getting this backwards is how one intermittently
+challenged page hides a real register error for as long as the block lasts;
+it did exactly that on 2026-08-29, on a run that had already printed
+`FAIL[charset-drift]`.
+
+Every way a run can fail to reach something is emitted as a `BLOCKED\t` token
+naming its kind, so a harness reading this file can tell "blocked" from "the
+register is wrong" without grepping English.
+
 Each entry names *which* check establishes it, because they are not
 interchangeable:
 
