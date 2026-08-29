@@ -168,9 +168,43 @@
 ;; in the text of an unrelated guard EXPLAINING what trips one. Prose written
 ;; to be read by people is not a machine interface.
 (def blocked (atom 0))
+;; The challenge is not the only way a run fails to answer. A timeout, a reset
+;; connection or a DNS failure produces :unreachable, which is just as much
+;; "this run established nothing about that source" -- and until 2026-08-29 it
+;; emitted NO token at all, so an outside harness could not see it. It read the
+;; exit code 2, found no BLOCKED line, and concluded the verifier had
+;; misclassified a register error. Counted separately rather than folded in,
+;; because "a third party is refusing us" and "we could not get there" are
+;; different things to go and look at.
+(def unreachable (atom 0))
 
 (defn- note-if-blocked! [reason]
-  (when (= :challenge-interposed reason) (swap! blocked inc)))
+  (case reason
+    :challenge-interposed (swap! blocked inc)
+    ;; check-host reports its own unreachability under a different name than
+    ;; check-page does. Both mean the same thing here -- nothing came back --
+    ;; and listing both is why this is a `case` over named reasons rather than
+    ;; a test for :refused: a refusal like :no-needles is the register being
+    ;; wrong about itself, which this run DID establish and must not report as
+    ;; a run that could not answer.
+    (:unreachable :host-unreachable) (swap! unreachable inc)
+    nil))
+
+(defn- print-blocked-tokens!
+  "Every reason this run could not answer, as TOKENS on their own lines.
+
+  Both start with BLOCKED\t so a harness can ask the single question it
+  actually has -- 'did this run fail to reach something?' -- with one match,
+  and still read which kind it was from the second field."
+  [where]
+  (when (pos? @blocked)
+    (println (str "BLOCKED\tchallenge\t" @blocked "\ta bot challenge stood in the way "
+                  "this many times " where ". Whatever it blocked was not measured "
+                  "either way.")))
+  (when (pos? @unreachable)
+    (println (str "BLOCKED\tunreachable\t" @unreachable "\tthis many source(s) could not "
+                  "be reached at all " where " -- timeout, reset or DNS. Not measured "
+                  "either way."))))
 
 (defn- with-timeout [f]
   (let [ctrl (js/AbortController.)
@@ -760,11 +794,7 @@
                               "run: this register cites no page, so there is nothing "
                               "for them to discriminate. Skipped, not passed.")))
               (when (seq bad)
-                (when (pos? @blocked)
-                  (println (str "BLOCKED\tchallenge\t" @blocked
-                                "\ta bot challenge blocked the self-tests. They did "
-                                "not fail to discriminate; they never ran against the "
-                                "authority.")))
+                (print-blocked-tokens! "in front of the self-tests")
                 (refuse! (str (count bad) " self-test(s) did not discriminate. "
                               "Nothing below would mean anything.")))
               (p/let [host-results (serially (fn [h] (p/let [r (check-host h)]
@@ -793,18 +823,51 @@
                   (doseq [r all] (note-if-blocked! (:reason r)))
                   (println (str "pass=" (count passed) " fail=" (count failed)
                                 " refused=" (count refused)))
-                  (when (pos? @blocked)
-                    (println (str "BLOCKED\tchallenge\t" @blocked
-                                  "\ta bot challenge stood in the way this many times. "
-                                  "Whatever it blocked was not measured either way.")))
+                  (print-blocked-tokens! "while checking the register")
                   (cond
+                    ;; A FAIL BEATS A REFUSAL, AND THE ORDER HERE IS THE WHOLE
+                    ;; POINT. A fail is a POSITIVE measurement: that page was
+                    ;; reached, decoded and read, and it did not say what the
+                    ;; register says it says. A DIFFERENT source that a bot
+                    ;; challenge or a timeout stood in front of establishes
+                    ;; nothing about it and therefore cannot unmake it.
+                    ;;
+                    ;; Refusing first is how ONE intermittently-blocked page
+                    ;; hides a real register error for as long as the block
+                    ;; lasts: the run answers 2, "could not answer", and
+                    ;; whoever reads it goes looking for a network problem
+                    ;; while a law title that changed sits in the output under
+                    ;; FAIL, already measured, saying so. Observed 2026-08-29
+                    ;; on this register: a charset-drift entry was caught
+                    ;; correctly (FAIL[charset-drift] enecho.home) in a run
+                    ;; that reported pass=31 fail=1 refused=1 -- and exited 2,
+                    ;; because chusho.finance had been challenged. The harness
+                    ;; that reads this file then reported that the verifier
+                    ;; does not discriminate, about a run whose own output
+                    ;; shows it discriminating.
+                    ;;
+                    ;; This is deliberately the OPPOSITE of the static branch
+                    ;; above, where refusals do win. There a source carrying no
+                    ;; runnable check undermines the read itself -- part of
+                    ;; what the register would be checked BY is the broken
+                    ;; part. Here the two sources are independent.
+                    ;;
+                    ;; The refusals are still counted and still printed, and
+                    ;; the message says the count is a FLOOR, so exit 1 is
+                    ;; never read as "everything else verified".
+                    (seq failed)
+                    (die! 1 (str "FAIL\t" (count failed) " source(s)"
+                                 (when (or (seq refused)
+                                           (not= (count results) (count sourced)))
+                                   (str ", and " (count refused) " more this run could "
+                                        "not establish either way. The register is "
+                                        "wrong; this count is a floor, not the whole "
+                                        "register."))))
+
                     (or (seq refused) (not= (count results) (count sourced)))
                     (refuse! (str (count refused) " source(s) could not be reached or carry "
                                   "no usable check. This run does not establish that the "
                                   "register is correct."))
-
-                    (seq failed)
-                    (die! 1 (str "FAIL\t" (count failed) " source(s)"))
 
                     :else
                     (die! 0 (str "OK\t" (count passed) " checks verified ("
