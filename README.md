@@ -73,7 +73,7 @@ cite. It is tx-data, so it loads the same way as every other EDN corpus here:
 (d/transact conn (edn/read-string (slurp "facts.edn")))
 ```
 
-`nbb scripts/verify-facts.cljs` re-fetches all of it against the live
+`nbb scripts/verify-facts.cljk` re-fetches all of it against the live
 authority and exits `0` verified / `1` the register is wrong / `2` the run
 could not answer. The third code carries most of the weight on these hosts,
 for the reason below.
